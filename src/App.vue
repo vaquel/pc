@@ -1,5 +1,7 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
+import BaseModal from './components/BaseModal.vue'
+import SliderCaptcha from './components/SliderCaptcha.vue'
 
 const username = ref('')
 const password = ref('')
@@ -8,6 +10,16 @@ const remember = ref(true)
 const forgotVisible = ref(false)
 const forgotAccount = ref('')
 const forgotGoogleCode = ref('')
+
+const registerVisible = ref(false)
+const registerAccount = ref('')
+const registerPassword = ref('')
+const registerPhone = ref('')
+const registerPhoneCode = ref('')
+const registerEmail = ref('')
+const registerEmailCode = ref('')
+const registerInviteCode = ref('')
+const registerSliderVerified = ref(false)
 
 const lines = ref([
   { id: 1, time: 0.101 },
@@ -45,8 +57,16 @@ function openForgot() {
   forgotVisible.value = true
 }
 
-function closeForgot() {
-  forgotVisible.value = false
+function openRegister() {
+  registerAccount.value = ''
+  registerPassword.value = ''
+  registerPhone.value = ''
+  registerPhoneCode.value = ''
+  registerEmail.value = ''
+  registerEmailCode.value = ''
+  registerInviteCode.value = ''
+  registerSliderVerified.value = false
+  registerVisible.value = true
 }
 
 function onForgotNext() {
@@ -56,6 +76,24 @@ function onForgotNext() {
   }
   console.log('forgot next', payload)
   alert('已展示找回密码弹窗：这里仅做 UI 演示，未接入真实接口。')
+}
+
+function onRegisterSubmit() {
+  if (!registerSliderVerified.value) {
+    alert('请先完成滑块验证。')
+    return
+  }
+  const payload = {
+    account: registerAccount.value.trim(),
+    password: registerPassword.value,
+    phone: registerPhone.value.trim(),
+    phoneCode: registerPhoneCode.value.trim(),
+    email: registerEmail.value.trim(),
+    emailCode: registerEmailCode.value.trim(),
+    inviteCode: registerInviteCode.value.trim(),
+  }
+  console.log('register submit', payload)
+  alert('已展示注册弹窗：这里仅做 UI 演示，未接入真实接口。')
 }
 
 function onLogin() {
@@ -68,25 +106,6 @@ function onLogin() {
   console.log('login payload', payload)
   alert('页面已复刻：这里仅做 UI 展示，未接入真实登录接口。')
 }
-
-function onKeydown(e) {
-  if (!forgotVisible.value) return
-  if (e.key === 'Escape') closeForgot()
-}
-
-onMounted(() => {
-  window.addEventListener('keydown', onKeydown)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onKeydown)
-})
-
-watch(forgotVisible, v => {
-  if (typeof document !== 'undefined') {
-    document.body.style.overflow = v ? 'hidden' : ''
-  }
-})
 </script>
 
 <template>
@@ -202,7 +221,7 @@ watch(forgotVisible, v => {
           <button class="loginBtn" type="submit">登 陆</button>
 
           <div class="change" aria-label="辅助链接">
-            <a class="item" href="javascript:void(0)">
+            <a class="item" href="javascript:void(0)" @click.prevent="openRegister">
               <span class="bottomIcon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="currentColor">
                   <path
@@ -210,7 +229,7 @@ watch(forgotVisible, v => {
                   />
                 </svg>
               </span>
-              解除锁定
+              立即注册
             </a>
             <span class="split" aria-hidden="true"></span>
             <a class="item" href="javascript:void(0)">
@@ -229,43 +248,75 @@ watch(forgotVisible, v => {
     </div>
   </div>
 
-  <div v-if="forgotVisible" class="modalMask" role="dialog" aria-modal="true" aria-label="找回密码">
-    <div class="modalMaskInner" @click="closeForgot"></div>
-    <div class="modal">
-      <div class="modalHeader">
-        <div class="modalTitle">找回密码</div>
-        <button class="modalClose" type="button" aria-label="关闭" @click="closeForgot">×</button>
+  <BaseModal v-model="forgotVisible" title="找回密码">
+    <div class="modalField">
+      <div class="modalLabel">平台账号</div>
+      <input v-model="forgotAccount" class="modalInput" type="text" autocomplete="username" placeholder="请输入您的平台账号" />
+    </div>
+
+    <div class="modalField">
+      <div class="modalLabel">谷歌验证码</div>
+      <input
+        v-model="forgotGoogleCode"
+        class="modalInput"
+        type="text"
+        inputmode="numeric"
+        placeholder="请输入您绑定的谷歌验证码"
+      />
+    </div>
+
+    <template #footer>
+      <button class="modalBtn" type="button" @click="onForgotNext">下一步</button>
+    </template>
+  </BaseModal>
+
+  <BaseModal v-model="registerVisible" title="立即注册" class="registerModal">
+    <div class="registerGrid">
+      <div class="modalField">
+        <div class="modalLabel">账号</div>
+        <input v-model="registerAccount" class="modalInput" type="text" autocomplete="username" placeholder="请输入账号" />
       </div>
 
-      <div class="modalBody">
-        <div class="modalField">
-          <div class="modalLabel">平台账号</div>
-          <input
-            v-model="forgotAccount"
-            class="modalInput"
-            type="text"
-            autocomplete="username"
-            placeholder="请输入您的平台账号"
-          />
-        </div>
-
-        <div class="modalField">
-          <div class="modalLabel">谷歌验证码</div>
-          <input
-            v-model="forgotGoogleCode"
-            class="modalInput"
-            type="text"
-            inputmode="numeric"
-            placeholder="请输入您绑定的谷歌验证码"
-          />
-        </div>
+      <div class="modalField">
+        <div class="modalLabel">密码</div>
+        <input v-model="registerPassword" class="modalInput" type="password" autocomplete="new-password" placeholder="请输入密码" />
       </div>
 
-      <div class="modalFooter">
-        <button class="modalBtn" type="button" @click="onForgotNext">下一步</button>
+      <div class="modalField">
+        <div class="modalLabel">手机号</div>
+        <input v-model="registerPhone" class="modalInput" type="text" inputmode="tel" autocomplete="tel" placeholder="请输入手机号" />
+      </div>
+
+      <div class="modalField">
+        <div class="modalLabel">手机号验证码</div>
+        <input v-model="registerPhoneCode" class="modalInput" type="text" inputmode="numeric" placeholder="请输入手机号验证码" />
+      </div>
+
+      <div class="modalField">
+        <div class="modalLabel">邮箱</div>
+        <input v-model="registerEmail" class="modalInput" type="email" inputmode="email" autocomplete="email" placeholder="请输入邮箱" />
+      </div>
+
+      <div class="modalField">
+        <div class="modalLabel">邮箱验证码</div>
+        <input v-model="registerEmailCode" class="modalInput" type="text" inputmode="numeric" placeholder="请输入邮箱验证码" />
+      </div>
+
+      <div class="modalField registerSpan2">
+        <div class="modalLabel">邀请码</div>
+        <input v-model="registerInviteCode" class="modalInput" type="text" placeholder="请输入邀请码（选填）" />
+      </div>
+
+      <div class="modalField registerSpan2">
+        <div class="modalLabel">滑块验证</div>
+        <SliderCaptcha v-model="registerSliderVerified" />
       </div>
     </div>
-  </div>
+
+    <template #footer>
+      <button class="modalBtn" type="button" :disabled="!registerSliderVerified" @click="onRegisterSubmit">注册</button>
+    </template>
+  </BaseModal>
 </template>
 
 <style>
@@ -691,126 +742,6 @@ body {
   color: rgba(11, 123, 255, 1);
 }
 
-.modalMask {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  box-sizing: border-box;
-}
-
-.modalMaskInner {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-}
-
-.modal {
-  position: relative;
-  width: 420px;
-  max-width: 100%;
-  background: #fff;
-  border-radius: 6px;
-  overflow: hidden;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
-}
-
-.modalHeader {
-  height: 56px;
-  background: #fff;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.modalTitle {
-  color: #111;
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-.modalClose {
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: rgba(17, 17, 17, 0.85);
-  font-size: 26px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.modalClose:hover {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.modalBody {
-  padding: 18px 18px 8px;
-  background: #f6f8fb;
-}
-
-.modalField {
-  margin-bottom: 16px;
-}
-
-.modalLabel {
-  color: #2f2f2f;
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 10px;
-}
-
-.modalInput {
-  width: 100%;
-  height: 52px;
-  border-radius: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  background: rgba(0, 0, 0, 0.03);
-  padding: 0 14px;
-  box-sizing: border-box;
-  font-size: 14px;
-  outline: none;
-}
-
-.modalInput:focus {
-  border-color: rgba(2, 129, 251, 0.85);
-  box-shadow: 0 0 0 3px rgba(2, 129, 251, 0.12);
-  background: #fff;
-}
-
-.modalFooter {
-  padding: 14px 18px 18px;
-  background: #f6f8fb;
-}
-
-.modalBtn {
-  width: 100%;
-  height: 56px;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-  color: #fff;
-  font-size: 16px;
-  font-weight: 700;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 64.29%), #0281fb;
-  background-blend-mode: overlay, normal;
-}
-
-.modalBtn:hover {
-  filter: brightness(1.03);
-}
-
 .loginBtn {
   width: 100%;
   height: 72px;
@@ -872,6 +803,68 @@ body {
   background: #d3d3d3;
   height: 20px;
   border-radius: 10px;
+}
+
+.registerModal .modal {
+  width: 560px;
+}
+
+.registerModal .modalTitle {
+  font-size: 18px;
+}
+
+.registerModal .modalBody {
+  padding: 14px 16px 6px;
+}
+
+.registerModal .modalFooter {
+  padding: 10px 16px 14px;
+}
+
+.registerModal .modalLabel {
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.registerModal .modalInput {
+  height: 44px;
+}
+
+.registerModal .modalBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.registerModal .modalBtn:disabled:hover {
+  filter: none;
+}
+
+.registerGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.registerGrid .modalField {
+  margin-bottom: 0;
+}
+
+.registerSpan2 {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 520px) {
+  .registerModal .modal {
+    width: 420px;
+  }
+
+  .registerGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .registerSpan2 {
+    grid-column: auto;
+  }
 }
 
 @media (max-width: 860px) {
