@@ -1,9 +1,13 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const username = ref('')
 const password = ref('')
 const remember = ref(true)
+
+const forgotVisible = ref(false)
+const forgotAccount = ref('')
+const forgotGoogleCode = ref('')
 
 const lines = ref([
   { id: 1, time: 0.101 },
@@ -37,6 +41,23 @@ function selectLine(id) {
   selectedLineId.value = id
 }
 
+function openForgot() {
+  forgotVisible.value = true
+}
+
+function closeForgot() {
+  forgotVisible.value = false
+}
+
+function onForgotNext() {
+  const payload = {
+    account: forgotAccount.value.trim(),
+    googleCode: forgotGoogleCode.value.trim(),
+  }
+  console.log('forgot next', payload)
+  alert('已展示找回密码弹窗：这里仅做 UI 演示，未接入真实接口。')
+}
+
 function onLogin() {
   const payload = {
     username: username.value.trim(),
@@ -47,6 +68,25 @@ function onLogin() {
   console.log('login payload', payload)
   alert('页面已复刻：这里仅做 UI 展示，未接入真实登录接口。')
 }
+
+function onKeydown(e) {
+  if (!forgotVisible.value) return
+  if (e.key === 'Escape') closeForgot()
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+})
+
+watch(forgotVisible, v => {
+  if (typeof document !== 'undefined') {
+    document.body.style.overflow = v ? 'hidden' : ''
+  }
+})
 </script>
 
 <template>
@@ -58,61 +98,63 @@ function onLogin() {
           <div class="text2">Always!</div>
         </div>
 
-        <div class="LoginLeft_bot" aria-label="客户端下载">
-          <button class="downloadItem" type="button">
-            <span class="btnIcon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path
-                  d="M17.6 9.48l1.84-3.18a.25.25 0 0 0-.09-.34.25.25 0 0 0-.34.09l-1.85 3.2A9.94 9.94 0 0 0 12 8c-1.86 0-3.61.51-5.16 1.39L4.99 6.19a.25.25 0 0 0-.34-.09.25.25 0 0 0-.09.34L6.4 9.48A9.94 9.94 0 0 0 2 17h20a9.94 9.94 0 0 0-4.4-7.52ZM9.5 14.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Zm5 0a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z"
-                />
-              </svg>
-            </span>
-            Android端下载
-          </button>
-          <button class="downloadItem" type="button">
-            <span class="btnIcon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path
-                  d="M16.5 13.1c-.1-2.2 1.8-3.3 1.9-3.4-1-1.5-2.6-1.7-3.2-1.8-1.4-.1-2.7.8-3.4.8-.7 0-1.8-.8-3-.8-1.5 0-2.9.9-3.7 2.2-1.6 2.8-.4 6.9 1.1 9.2.7 1.1 1.6 2.3 2.8 2.3 1.1 0 1.5-.7 2.9-.7 1.3 0 1.7.7 2.9.7 1.2 0 2-.1 3-1.5.6-.9.8-1.3 1.3-2.4-.1 0-2.6-1-2.6-3.6ZM14.3 6.2c.6-.7 1-1.7.9-2.7-.9.1-1.9.6-2.5 1.4-.6.7-1 1.7-.9 2.6 1 .1 1.9-.5 2.5-1.3Z"
-                />
-              </svg>
-            </span>
-            IOS端下载
-          </button>
-        </div>
-
-        <div class="group" aria-label="线路选择">
-          <div class="title">
-            <span>线路选择</span>
-            <div class="cont">
-              <span>刷新</span>
-              <button class="refresh" type="button" @click="refreshLines" aria-label="刷新线路">
+        <div class="leftLower">
+          <div class="LoginLeft_bot" aria-label="客户端下载">
+            <button class="downloadItem" type="button">
+              <span class="btnIcon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="currentColor">
                   <path
-                    d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 13.65-6.65Z"
+                    d="M17.6 9.48l1.84-3.18a.25.25 0 0 0-.09-.34.25.25 0 0 0-.34.09l-1.85 3.2A9.94 9.94 0 0 0 12 8c-1.86 0-3.61.51-5.16 1.39L4.99 6.19a.25.25 0 0 0-.34-.09.25.25 0 0 0-.09.34L6.4 9.48A9.94 9.94 0 0 0 2 17h20a9.94 9.94 0 0 0-4.4-7.52ZM9.5 14.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Zm5 0a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z"
                   />
                 </svg>
-              </button>
-            </div>
+              </span>
+              Android端下载
+            </button>
+            <button class="downloadItem" type="button">
+              <span class="btnIcon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path
+                    d="M16.5 13.1c-.1-2.2 1.8-3.3 1.9-3.4-1-1.5-2.6-1.7-3.2-1.8-1.4-.1-2.7.8-3.4.8-.7 0-1.8-.8-3-.8-1.5 0-2.9.9-3.7 2.2-1.6 2.8-.4 6.9 1.1 9.2.7 1.1 1.6 2.3 2.8 2.3 1.1 0 1.5-.7 2.9-.7 1.3 0 1.7.7 2.9.7 1.2 0 2-.1 3-1.5.6-.9.8-1.3 1.3-2.4-.1 0-2.6-1-2.6-3.6ZM14.3 6.2c.6-.7 1-1.7.9-2.7-.9.1-1.9.6-2.5 1.4-.6.7-1 1.7-.9 2.6 1 .1 1.9-.5 2.5-1.3Z"
+                  />
+                </svg>
+              </span>
+              IOS端下载
+            </button>
           </div>
 
-          <div class="LoginLeft_top">
-            <div class="scrollbar-flex-content">
-              <button
-                v-for="l in lines"
-                :key="l.id"
-                class="scrollbar-item"
-                type="button"
-                @click="selectLine(l.id)"
-              >
-                <div class="content" :class="[getLineColor(l.time), { active: l.id === selectedLineId }]">
-                  <div class="ms">{{ l.time.toFixed(3) }} s</div>
-                  <div class="progress" aria-hidden="true">
-                    <div class="progressFill" :style="{ width: `${Math.round(getLinePercent(l.time) * 100)}%` }"></div>
+          <div class="group" aria-label="线路选择">
+            <div class="title">
+              <span>线路选择</span>
+              <div class="cont">
+                <span>刷新</span>
+                <button class="refresh" type="button" @click="refreshLines" aria-label="刷新线路">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                      d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 13.65-6.65Z"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="LoginLeft_top">
+              <div class="scrollbar-flex-content">
+                <button
+                  v-for="l in lines"
+                  :key="l.id"
+                  class="scrollbar-item"
+                  type="button"
+                  @click="selectLine(l.id)"
+                >
+                  <div class="content" :class="[getLineColor(l.time), { active: l.id === selectedLineId }]">
+                    <div class="ms">{{ l.time.toFixed(3) }} s</div>
+                    <div class="progress" aria-hidden="true">
+                      <div class="progressFill" :style="{ width: `${Math.round(getLinePercent(l.time) * 100)}%` }"></div>
+                    </div>
                   </div>
-                </div>
-                <div class="title">线路{{ l.id }}</div>
-              </button>
+                  <div class="title">线路{{ l.id }}</div>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -153,7 +195,7 @@ function onLogin() {
               <span>记住密码</span>
             </label>
             <div class="forgetPwd">
-              <a href="javascript:void(0)">忘记密码?</a>
+              <a href="javascript:void(0)" @click.prevent="openForgot">忘记密码?</a>
             </div>
           </div>
 
@@ -184,6 +226,44 @@ function onLogin() {
           </div>
         </form>
       </section>
+    </div>
+  </div>
+
+  <div v-if="forgotVisible" class="modalMask" role="dialog" aria-modal="true" aria-label="找回密码">
+    <div class="modalMaskInner" @click="closeForgot"></div>
+    <div class="modal">
+      <div class="modalHeader">
+        <div class="modalTitle">找回密码</div>
+        <button class="modalClose" type="button" aria-label="关闭" @click="closeForgot">×</button>
+      </div>
+
+      <div class="modalBody">
+        <div class="modalField">
+          <div class="modalLabel">平台账号</div>
+          <input
+            v-model="forgotAccount"
+            class="modalInput"
+            type="text"
+            autocomplete="username"
+            placeholder="请输入您的平台账号"
+          />
+        </div>
+
+        <div class="modalField">
+          <div class="modalLabel">谷歌验证码</div>
+          <input
+            v-model="forgotGoogleCode"
+            class="modalInput"
+            type="text"
+            inputmode="numeric"
+            placeholder="请输入您绑定的谷歌验证码"
+          />
+        </div>
+      </div>
+
+      <div class="modalFooter">
+        <button class="modalBtn" type="button" @click="onForgotNext">下一步</button>
+      </div>
     </div>
   </div>
 </template>
@@ -257,6 +337,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 25px;
+}
+
+.leftLower {
+  transform: translateY(10px);
 }
 
 .text1 {
@@ -605,6 +689,126 @@ body {
 
 .forgetPwd a:hover {
   color: rgba(11, 123, 255, 1);
+}
+
+.modalMask {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.modalMaskInner {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.modal {
+  position: relative;
+  width: 420px;
+  max-width: 100%;
+  background: #fff;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+}
+
+.modalHeader {
+  height: 56px;
+  background: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.modalTitle {
+  color: #111;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.modalClose {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(17, 17, 17, 0.85);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modalClose:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.modalBody {
+  padding: 18px 18px 8px;
+  background: #f6f8fb;
+}
+
+.modalField {
+  margin-bottom: 16px;
+}
+
+.modalLabel {
+  color: #2f2f2f;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.modalInput {
+  width: 100%;
+  height: 52px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.03);
+  padding: 0 14px;
+  box-sizing: border-box;
+  font-size: 14px;
+  outline: none;
+}
+
+.modalInput:focus {
+  border-color: rgba(2, 129, 251, 0.85);
+  box-shadow: 0 0 0 3px rgba(2, 129, 251, 0.12);
+  background: #fff;
+}
+
+.modalFooter {
+  padding: 14px 18px 18px;
+  background: #f6f8fb;
+}
+
+.modalBtn {
+  width: 100%;
+  height: 56px;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 64.29%), #0281fb;
+  background-blend-mode: overlay, normal;
+}
+
+.modalBtn:hover {
+  filter: brightness(1.03);
 }
 
 .loginBtn {
