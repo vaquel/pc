@@ -195,11 +195,11 @@ export const captchaApi = {
 }
 
 export const smsApi = {
-  sendCode: phone => http.post('https://api.msgameapi.com/sms', { phone }, { auth: false }),
+  sendCode: phone => http.post('/sms', { phone }, { auth: false }),
 }
 
 export const emailApi = {
-  sendCode: email => http.post('https://api.msgameapi.com/email', { email }, { auth: false }),
+  sendCode: email => http.post('/email', { email }, { auth: false }),
 }
 
 export const homeApi = {

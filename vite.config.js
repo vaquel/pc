@@ -41,6 +41,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
       },
+      '/email': {
+        target: 'https://api.msgameapi.com',
+        changeOrigin: true,
+        secure: true,
+      },
       '/uploads': {
         target: 'https://api.msgameapi.com',
         changeOrigin: true,
