@@ -1,6 +1,8 @@
 <script setup>
 import { onBeforeUnmount, watch } from 'vue'
 
+defineOptions({ inheritAttrs: false })
+
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   title: { type: String, default: '' },
@@ -68,6 +70,7 @@ onBeforeUnmount(() => {
       <div
         v-if="modelValue"
         class="modalMask"
+        v-bind="$attrs"
         role="dialog"
         aria-modal="true"
         :aria-label="title || '弹窗'"
@@ -114,14 +117,17 @@ onBeforeUnmount(() => {
   position: relative;
   width: 420px;
   max-width: 100%;
+  max-height: calc(100vh - 48px);
   background: #fff;
   border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
 }
 
 .modalHeader {
-  height: 56px;
+  height: 100px;
   background: #fff;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   display: flex;
@@ -133,7 +139,7 @@ onBeforeUnmount(() => {
 .modalTitle {
   color: #111;
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.5px;
 }
 
@@ -160,11 +166,15 @@ onBeforeUnmount(() => {
 .modalBody {
   padding: 18px 18px 8px;
   background: #f6f8fb;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
 }
 
 .modalFooter {
   padding: 14px 18px 18px;
   background: #f6f8fb;
+  flex: 0;
 }
 
 :deep(.modalField) {
@@ -174,7 +184,7 @@ onBeforeUnmount(() => {
 :deep(.modalLabel) {
   color: #2f2f2f;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   margin-bottom: 10px;
 }
 
@@ -204,13 +214,46 @@ onBeforeUnmount(() => {
   cursor: pointer;
   color: #fff;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 500;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 64.29%), #0281fb;
   background-blend-mode: overlay, normal;
 }
 
 :deep(.modalBtn:hover) {
   filter: brightness(1.03);
+}
+
+:deep(.codeRow) {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+:deep(.codeRow .modalInput) {
+  flex: 1;
+}
+
+:deep(.codeRow .codeBtn) {
+  width: 120px;
+  height: 52px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #f8f9fa;
+  color: #333;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+:deep(.codeRow .codeBtn:hover:not(:disabled)) {
+  background: #eef0f3;
+}
+
+:deep(.codeRow .codeBtn:disabled) {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #f0f0f0;
 }
 
 .baseModal-enter-active,
