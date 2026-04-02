@@ -3,7 +3,7 @@ import { showError } from '../ui/modal'
 const DEFAULT_TIMEOUT_MS = 15000
 const DEFAULT_CONTENT_TYPE = 'application/x-www-form-urlencoded; charset=UTF-8'
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.msgameapi.com'
 
 export class ApiError extends Error {
   constructor(message, { status, code, data, url, method } = {}) {
