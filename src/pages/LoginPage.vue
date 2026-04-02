@@ -3,8 +3,9 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseModal from '../components/BaseModal.vue'
 import ImageCaptcha from '../components/ImageCaptcha.vue'
-import { emailApi, regApi, siteApi, smsApi } from '../api'
+import { authApi, captchaApi, emailApi, regApi, siteApi, smsApi } from '../api'
 import { applySite, siteState } from '../store/site'
+import { showError } from '../ui/modal'
 
 const router = useRouter()
 
@@ -13,6 +14,11 @@ const logoSrc = computed(() => siteState.webLogo || '/assets/logo_blue-B7kOdN8N.
 const username = ref('')
 const password = ref('')
 const remember = ref(true)
+const captchaCode = ref('')
+const captchaSrc = ref('')
+const captchaLoading = ref(false)
+const loginLoading = ref(false)
+let captchaObjectUrl = ''
 
 const forgotVisible = ref(false)
 const forgotAccount = ref('')
@@ -263,17 +269,87 @@ async function onSendEmailCode() {
   }
 }
 
-function onLogin() {
-  const payload = {
-    username: username.value.trim(),
-    password: password.value,
-    remember: remember.value,
-    line: selectedLine.value?.id ?? null,
+async function onLogin() {
+  const account = username.value.trim()
+  const pwd = password.value
+  const cap = captchaCode.value.trim()
+
+  if (!account) return showError('请输入您的用户名', '登录失败')
+  if (!pwd) return showError('请输入您的登录密码', '登录失败')
+  if (!cap) return showError('请输入验证码', '登录失败')
+  if (loginLoading.value) return
+
+  loginLoading.value = true
+  try {
+    const res = await authApi.login({ account, password: pwd, captcha: cap })
+    const token =
+      (res && res.data && (res.data.token || res.data.Token || res.data.access_token || res.data.accessToken)) ||
+      (res && (res.token || res.Token || res.access_token || res.accessToken)) ||
+      ''
+    if (token) localStorage.setItem('token', String(token))
+    forgotVisible.value = false
+    registerVisible.value = false
+    router.push('/home')
+  } catch (e) {
+    showError(e?.message || '登录失败', '登录失败')
+    captchaCode.value = ''
+    loadCaptcha()
+  } finally {
+    loginLoading.value = false
   }
-  console.log('login payload', payload)
-  forgotVisible.value = false
-  registerVisible.value = false
-  router.push('/home')
+}
+
+function toDataUrlFromSvg(svg) {
+  const s = String(svg || '').trim()
+  if (!s) return ''
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(s)}`
+}
+
+function normalizeCaptchaSrc(input) {
+  if (!input) return ''
+  if (typeof input === 'string') {
+    const s = input.trim()
+    if (!s) return ''
+    if (s.startsWith('data:')) return s
+    if (s.startsWith('<svg')) return toDataUrlFromSvg(s)
+    if (/^https?:\/\//i.test(s)) return s
+    if (s.startsWith('/')) return s
+    if (/^[A-Za-z0-9+/=]+$/.test(s) && s.length > 80) return `data:image/png;base64,${s}`
+    return s
+  }
+  if (typeof input === 'object') {
+    const v = input.image || input.img || input.captcha || input.base64 || input.url || ''
+    return normalizeCaptchaSrc(v)
+  }
+  return ''
+}
+
+async function loadCaptcha() {
+  if (captchaLoading.value) return
+  captchaLoading.value = true
+  try {
+    const res = await captchaApi.getCaptchaRaw()
+    const ct = (res.headers.get('content-type') || '').toLowerCase()
+    if (ct.includes('application/json')) {
+      const json = await res.json().catch(() => null)
+      const src = normalizeCaptchaSrc(json?.data ?? json)
+      if (src) captchaSrc.value = src
+      return
+    }
+    if (ct.startsWith('image/')) {
+      const blob = await res.blob()
+      if (captchaObjectUrl) URL.revokeObjectURL(captchaObjectUrl)
+      captchaObjectUrl = URL.createObjectURL(blob)
+      captchaSrc.value = captchaObjectUrl
+      return
+    }
+    const text = await res.text().catch(() => '')
+    const src = normalizeCaptchaSrc(text)
+    if (src) captchaSrc.value = src
+  } catch {
+  } finally {
+    captchaLoading.value = false
+  }
 }
 
 onMounted(async () => {
@@ -288,6 +364,8 @@ onMounted(async () => {
     regConfig.value = cfg
     registerEnabled.value = String(cfg.register_state || '') !== '2'
   } catch {}
+
+  loadCaptcha()
 })
 
 watch(
@@ -317,6 +395,10 @@ onUnmounted(() => {
   if (emailCodeTimer) {
     clearInterval(emailCodeTimer)
     emailCodeTimer = null
+  }
+  if (captchaObjectUrl) {
+    URL.revokeObjectURL(captchaObjectUrl)
+    captchaObjectUrl = ''
   }
 })
 </script>
@@ -397,7 +479,7 @@ onUnmounted(() => {
           <img :src="logoSrc" alt="蓝图 blueprint" />
         </div>
 
-        <form class="LoginRight_div" @submit.prevent="onLogin">
+        <form class="LoginRight_div loginWithCaptcha" @submit.prevent="onLogin">
           <ul>
             <li>
               <span class="icon a" aria-hidden="true">
@@ -419,6 +501,18 @@ onUnmounted(() => {
               </span>
               <input v-model="password" type="password" autocomplete="current-password" placeholder="请输入您的登录密码" />
             </li>
+            <li class="captchaLi">
+              <span class="icon c" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4Zm0 18.1c-3.46-1.15-6-4.93-6-8.8V6.35L12 3.7l6 2.65v3.95c0 3.87-2.54 7.65-6 8.8Z" />
+                </svg>
+              </span>
+              <input v-model="captchaCode" type="text" autocomplete="off" placeholder="请输入验证码" />
+              <button class="captchaBox" type="button" :disabled="captchaLoading" @click="loadCaptcha">
+                <img v-if="captchaSrc" :src="captchaSrc" alt="验证码" />
+                <span v-else>{{ captchaLoading ? '加载中' : '获取验证码' }}</span>
+              </button>
+            </li>
           </ul>
 
           <div class="remember">
@@ -431,7 +525,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <button class="loginBtn" type="submit">登 陆</button>
+          <button class="loginBtn" type="submit" :disabled="loginLoading">{{ loginLoading ? '登录中...' : '登 陆' }}</button>
 
           <div class="change" aria-label="辅助链接">
             <a v-if="registerEnabled" class="item" href="javascript:void(0)" @click.prevent="openRegister">
@@ -562,6 +656,57 @@ onUnmounted(() => {
 .required {
   color: red;
   margin-right: 4px;
+}
+
+.loginWithCaptcha ul li {
+  margin-bottom: 16px;
+}
+
+.loginWithCaptcha .loginBtn {
+  margin-top: 24px;
+}
+
+.loginWithCaptcha .change {
+  margin: 26px 0 0;
+}
+
+.captchaLi input {
+  padding-right: 150px;
+}
+
+.captchaBox {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 42px;
+  min-width: 120px;
+  padding: 0 10px;
+  border-radius: 7.2px;
+  border: 1.44px solid #e8f4ff;
+  background: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.captchaBox:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.captchaBox img {
+  height: 36px;
+  width: auto;
+  display: block;
+}
+
+.captchaBox span {
+  color: #7f818f;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .loginbg {

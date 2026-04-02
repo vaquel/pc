@@ -169,7 +169,7 @@ export const http = createHttpClient({
 })
 
 export const authApi = {
-  login: payload => http.post('/api/login', payload, { auth: false }),
+  login: payload => http.post('/login', payload, { auth: false }),
   register: payload => http.post('/api/register', payload, { auth: false }),
   forgotPassword: payload => http.post('/api/forgot-password', payload, { auth: false }),
 }
@@ -186,12 +186,17 @@ export const noticeApi = {
   getNotices: () => http.post('/notice', undefined, { auth: false }),
 }
 
+export const gameTypeApi = {
+  getGameTypes: () => http.post('/game_type', undefined, { auth: true }),
+}
+
 export const regApi = {
   getRegConfig: () => http.post('/reg_c', undefined, { auth: false }),
 }
 
 export const captchaApi = {
   getCaptcha: () => http.post('/captcha', undefined, { auth: false }),
+  getCaptchaRaw: () => http.request('/captcha', { auth: false, raw: true }),
 }
 
 export const smsApi = {

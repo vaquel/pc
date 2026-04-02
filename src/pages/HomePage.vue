@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { bannerApi, noticeApi } from '../api'
+import { API_BASE_URL, bannerApi, gameTypeApi, noticeApi } from '../api'
 import { siteState } from '../store/site'
 
 const router = useRouter()
@@ -19,14 +19,22 @@ function updateIsWap() {
   isWap.value = window.matchMedia?.('(max-width: 740px)')?.matches ?? window.innerWidth <= 740
 }
 
+function joinUrl(base, path) {
+  const b = String(base || '').replace(/\/+$/, '')
+  const p = String(path || '').replace(/^\/+/, '')
+  if (!b) return `/${p}`
+  if (!p) return b
+  return `${b}/${p}`
+}
+
 function normalizeAssetUrl(input) {
   if (!input) return ''
   const s = String(input).replaceAll('\\/', '/').trim()
   if (!s) return ''
   if (s.startsWith('http://') || s.startsWith('https://')) return s
   if (s.startsWith('//')) return `https:${s}`
-  if (s.startsWith('/')) return s
-  return `https://${s}`
+  if (s.includes('api.msgameapi.com') && !s.startsWith('http')) return `https://${s}`
+  return joinUrl(API_BASE_URL, s)
 }
 
 function normalizeGoUrl(input) {
@@ -103,22 +111,31 @@ onMounted(async () => {
   }
   try {
     const res = await bannerApi.getBanners(2)
-    const list = Array.isArray(res?.data) ? res.data : []
+    const data = res?.data
+    const list = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.list)
+        ? data.list
+        : Array.isArray(data?.items)
+          ? data.items
+          : Array.isArray(data?.rows)
+            ? data.rows
+            : []
     const mapped = list
       .map(it => {
-        const showStatus = Number(it?.show_status ?? 1)
+        const showStatus = Number(it?.show_status ?? it?.showStatus ?? 1)
         const allowed =
           showStatus === 1 || (showStatus === 2 && !isWap.value) || (showStatus === 3 && isWap.value)
         if (!allowed) return null
-        const img = normalizeAssetUrl(it?.img)
-        const goUrl = normalizeGoUrl(it?.go_url)
+        const img = normalizeAssetUrl(it?.img ?? it?.image ?? it?.pic ?? it?.cover ?? it?.banner)
+        const goUrl = normalizeGoUrl(it?.go_url ?? it?.goUrl ?? it?.url ?? it?.link)
         return {
-          title: String(it?.title || ''),
+          title: String(it?.title ?? it?.name ?? ''),
           sub: '',
           image: img,
           art: '/lt01/hero-art.svg',
           goUrl,
-          orders: Number(it?.orders ?? 0),
+          orders: Number(it?.orders ?? it?.order ?? it?.sort ?? 0),
         }
       })
       .filter(Boolean)
@@ -163,8 +180,82 @@ const navItems = [
   { label: '彩票', active: false },
   { label: '娱乐', active: false },
   { label: '管理', active: false },
-  { label: '理财', active: false },
 ]
+
+const navRef = ref(null)
+const gameMenuVisible = ref(false)
+const gameMenuLeft = ref(0)
+const gameTypes = ref([])
+const gameTypeLoading = ref(false)
+const gameMenuWidth = 980
+let gameTypeFetchedAt = 0
+let gameMenuHideTimer = 0
+
+function cancelHideGameMenu() {
+  if (!gameMenuHideTimer) return
+  window.clearTimeout(gameMenuHideTimer)
+  gameMenuHideTimer = 0
+}
+
+function scheduleHideGameMenu() {
+  cancelHideGameMenu()
+  gameMenuHideTimer = window.setTimeout(() => {
+    gameMenuVisible.value = false
+    gameMenuHideTimer = 0
+  }, 120)
+}
+
+function resolveGameTypeIcon(item) {
+  const icon = isWap.value ? item?.wap_icon : item?.pc_icon
+  return normalizeAssetUrl(icon || '')
+}
+
+async function loadGameTypesIfNeeded() {
+  if (gameTypeLoading.value) return
+  const now = Date.now()
+  if (gameTypeFetchedAt && now - gameTypeFetchedAt < 30000 && gameTypes.value.length) return
+  gameTypeLoading.value = true
+  try {
+    const res = await gameTypeApi.getGameTypes()
+    const list = Array.isArray(res?.data) ? res.data : []
+    const mapped = list
+      .map(it => ({
+        title: String(it?.title || ''),
+        type: Number(it?.type ?? 0),
+        orders: Number(it?.orders ?? 0),
+        icon: resolveGameTypeIcon(it),
+      }))
+      .filter(it => it.title)
+      .sort((a, b) => (a.orders ?? 0) - (b.orders ?? 0))
+    gameTypes.value = mapped
+    gameTypeFetchedAt = now
+  } catch {
+  } finally {
+    gameTypeLoading.value = false
+  }
+}
+
+function onNavItemEnter(it, ev) {
+  if (it?.label !== '娱乐') {
+    if (gameMenuVisible.value) scheduleHideGameMenu()
+    return
+  }
+  cancelHideGameMenu()
+  gameMenuVisible.value = true
+  const navEl = navRef.value
+  const target = ev?.currentTarget
+  if (navEl && target?.getBoundingClientRect) {
+    const navRect = navEl.getBoundingClientRect()
+    const tRect = target.getBoundingClientRect()
+    const center = tRect.left - navRect.left + tRect.width / 2
+    const half = gameMenuWidth / 2
+    const clamped = Math.max(half, Math.min(navRect.width - half, center))
+    gameMenuLeft.value = clamped
+  } else {
+    gameMenuLeft.value = 0
+  }
+  loadGameTypesIfNeeded()
+}
 
 const hotLottery = [
   '台湾5分彩',
@@ -173,9 +264,10 @@ const hotLottery = [
   '币安5分彩',
   '以太坊12秒',
   '波场极速30秒',
+  '波场极速15秒',
+  '币安极速15秒',
+  '币安极速30秒',
 ]
-
-const hotEntertain = ['波场极速15秒', '币安极速15秒', '币安极速30秒']
 
 function formatNoticeDate(input) {
   if (!input) return ''
@@ -226,7 +318,6 @@ const browserRecommends = [
 ]
 
 const floatMenus = [
-  { key: 'finance', label: '理财' },
   { key: 'activity', label: '活动' },
   { key: 'service', label: '客服' },
   { key: 'download', label: '下载' },
@@ -243,16 +334,37 @@ const floatMenus = [
           <img class="brandLogo" :src="logoSrc()" alt="蓝图 blueprint" />
         </div>
 
-        <nav class="nav" aria-label="主导航">
+        <nav ref="navRef" class="nav" aria-label="主导航" @mouseleave="scheduleHideGameMenu">
           <a
             v-for="it in navItems"
             :key="it.label"
             class="navItem"
             href="javascript:void(0)"
             :data-active="it.active ? '1' : '0'"
+            :data-label="it.label"
+            :data-open="it.label === '娱乐' && gameMenuVisible ? '1' : '0'"
+            @mouseenter="e => onNavItemEnter(it, e)"
           >
             {{ it.label }}
           </a>
+
+          <div
+            v-if="gameMenuVisible"
+            class="gameMenu"
+            :style="{ left: `${gameMenuLeft}px`, width: `${gameMenuWidth}px` }"
+            @mouseenter="cancelHideGameMenu"
+            @mouseleave="scheduleHideGameMenu"
+          >
+            <div v-if="gameTypeLoading && !gameTypes.length" class="gameMenuHint">加载中...</div>
+            <div v-else class="gameMenuGrid">
+              <button v-for="g in gameTypes" :key="g.type" class="gameMenuCard" type="button">
+                <div class="gameMenuCardTitle">{{ g.title }}</div>
+                <div class="gameMenuCardMedia" aria-hidden="true">
+                  <img v-if="g.icon" :src="g.icon" alt="" />
+                </div>
+              </button>
+            </div>
+          </div>
         </nav>
 
         <div class="headerRight">
@@ -281,7 +393,6 @@ const floatMenus = [
                   :data-clickable="b.goUrl ? '1' : '0'"
                   @click="onBannerClick(b)"
                 >
-                  <img class="heroArt" :src="b.art" alt="" aria-hidden="true" />
                 </div>
               </div>
             </div>
@@ -307,7 +418,7 @@ const floatMenus = [
 
       <section class="content">
         <div class="grid">
-          <div class="panel">
+          <div class="panel hotLotteryPanel">
             <div class="panelHeader">
               <div class="panelTitle">热门彩票游戏</div>
             </div>
@@ -316,10 +427,10 @@ const floatMenus = [
             </div>
           </div>
 
-          <div class="panel">
+          <div class="panel noticePanel">
             <div class="panelHeader">
               <div class="panelTitle">系统公告</div>
-              <a class="panelMore" href="javascript:void(0)">全部 &gt;</a>
+              <a class="panelMore" href="javascript:void(0)">全部</a>
             </div>
             <div class="noticeList" role="list">
               <div v-for="n in notices" :key="n.title" class="noticeItem" role="listitem">
@@ -438,11 +549,12 @@ const floatMenus = [
 
 <style scoped>
 .site {
+  --homeText: rgba(51, 51, 51, 0.98);
   min-height: 100vh;
   background:
     radial-gradient(800px 420px at 50% 0%, rgba(11, 102, 255, 0.06), rgba(11, 102, 255, 0) 70%),
     linear-gradient(180deg, rgba(245, 247, 251, 1), rgba(245, 247, 251, 1));
-  color: #333;
+  color: var(--homeText);
 }
 
 .siteHeader {
@@ -478,20 +590,102 @@ const floatMenus = [
   align-items: center;
   gap: 18px;
   flex: 1;
+  position: relative;
 }
 
 .navItem {
-  color: rgba(17, 17, 17, 0.75);
+  color: var(--homeText);
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
   padding: 8px 10px;
   border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .navItem[data-active='1'] {
-  color: rgba(17, 17, 17, 0.88);
+  color: var(--homeText);
   background: transparent;
+}
+
+.navItem[data-label='娱乐']::after {
+  content: '▾';
+  font-size: 12px;
+  transform: translateY(-1px);
+}
+
+.navItem[data-label='娱乐'][data-open='1']::after {
+  content: '▴';
+}
+
+.gameMenu {
+  position: absolute;
+  top: calc(100% + 10px);
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  padding: 14px;
+  z-index: 100;
+}
+
+.gameMenuHint {
+  padding: 18px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--homeText);
+}
+
+.gameMenuGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.gameMenuCard {
+  border: 1px solid rgba(11, 123, 255, 0.18);
+  background: linear-gradient(180deg, rgba(235, 248, 255, 1), rgba(255, 255, 255, 1));
+  border-radius: 10px;
+  height: 140px;
+  padding: 14px 14px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+}
+
+.gameMenuCard:hover {
+  border-color: rgba(11, 123, 255, 0.3);
+  background: linear-gradient(180deg, rgba(226, 245, 255, 1), rgba(255, 255, 255, 1));
+}
+
+.gameMenuCardTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--homeText);
+  position: relative;
+  z-index: 1;
+}
+
+.gameMenuCardMedia {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 44px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gameMenuCardMedia img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .headerRight {
@@ -505,24 +699,24 @@ const floatMenus = [
   align-items: center;
   gap: 8px;
   margin-right: 4px;
-  color: rgba(17, 17, 17, 0.6);
+  color: var(--homeText);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
 }
 
 .userGreet {
-  color: rgba(17, 17, 17, 0.55);
+  color: var(--homeText);
 }
 
 .userLink {
-  color: rgba(11, 102, 255, 1);
+  color: var(--homeText);
   text-decoration: none;
   font-weight: 500;
 }
 
 .userMeta {
-  color: rgba(17, 17, 17, 0.6);
+  color: var(--homeText);
 }
 
 .headerBtn {
@@ -531,7 +725,7 @@ const floatMenus = [
   border-radius: 10px;
   border: 1px solid rgba(0, 0, 0, 0.1);
   background: #fff;
-  color: rgba(17, 17, 17, 0.7);
+  color: var(--homeText);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -582,7 +776,7 @@ const floatMenus = [
 }
 
 .siteMain {
-  max-width: 1200px;
+  max-width: 1380px;
   margin: 0 auto;
   padding: 14px 16px 26px;
   box-sizing: border-box;
@@ -630,7 +824,7 @@ const floatMenus = [
 }
 
 .heroInnerLoading {
-  background: radial-gradient(1000px 520px at 70% 30%, rgba(11, 102, 255, 0.45), rgba(2, 20, 64, 0.92));
+  background: #fff;
 }
 
 .heroInner[data-clickable='1'] {
@@ -768,16 +962,92 @@ const floatMenus = [
 }
 
 .panelTitle {
-  color: rgba(17, 17, 17, 0.82);
+  color: var(--homeText);
   font-size: 14px;
   font-weight: 500;
 }
 
 .panelMore {
-  color: rgba(11, 102, 255, 0.9);
+  color: var(--homeText);
   text-decoration: none;
   font-size: 12px;
   font-weight: 500;
+}
+
+.hotLotteryPanel .panelHeader {
+  height: auto;
+  padding: 16px 16px 0;
+  border-bottom: 0;
+}
+
+.hotLotteryPanel .panelTitle {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--homeText);
+}
+
+.noticePanel .panelHeader {
+  height: auto;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.noticePanel .panelTitle {
+  color: var(--homeText);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.noticePanel .panelMore {
+  color: var(--homeText);
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.noticePanel .panelMore::after {
+  content: '>';
+  color: var(--homeText);
+}
+
+.noticePanel .noticeList {
+  padding: 0;
+}
+
+.noticePanel .noticeItem {
+  padding: 12px 16px;
+  min-height: 46px;
+  box-sizing: border-box;
+  border-bottom: 1px solid rgba(11, 102, 255, 0.18);
+}
+
+.noticePanel .noticeItem:last-child {
+  border-bottom: 0;
+}
+
+.noticePanel .noticeTitle {
+  color: var(--homeText);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.noticePanel .noticeIcon {
+  width: 14px;
+  height: 14px;
+  border-radius: 0;
+  background: url('/lt01/notice-icon.svg') center / 14px 14px no-repeat;
+}
+
+.noticePanel .noticeDate {
+  color: var(--homeText);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.noticePanel .noticeItem:hover {
+  background: rgba(11, 102, 255, 0.04);
 }
 
 .btnGrid {
@@ -785,6 +1055,11 @@ const floatMenus = [
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
+}
+
+.hotLotteryPanel .btnGrid {
+  padding: 12px 16px 16px;
+  gap: 12px;
 }
 
 .btnGridSmall {
@@ -837,19 +1112,19 @@ const floatMenus = [
 }
 
 .securityTitle {
-  color: rgba(17, 17, 17, 0.78);
+  color: var(--homeText);
   font-size: 13px;
   font-weight: 500;
 }
 
 .securityPct {
-  color: rgba(251, 77, 64, 1);
+  color: var(--homeText);
   margin-left: 6px;
 }
 
 .securityDesc {
   margin-top: 6px;
-  color: rgba(17, 17, 17, 0.55);
+  color: var(--homeText);
   font-size: 12px;
   font-weight: 400;
   line-height: 1.5;
@@ -918,7 +1193,7 @@ const floatMenus = [
 }
 
 .downloadLabel {
-  color: rgba(17, 17, 17, 0.7);
+  color: var(--homeText);
   font-size: 12px;
   font-weight: 500;
 }
@@ -963,14 +1238,14 @@ const floatMenus = [
 
 .advTitle {
   margin-top: 10px;
-  color: rgba(17, 17, 17, 0.82);
+  color: var(--homeText);
   font-size: 14px;
   font-weight: 500;
 }
 
 .advDesc {
   margin-top: 8px;
-  color: rgba(17, 17, 17, 0.6);
+  color: var(--homeText);
   font-size: 12px;
   font-weight: 400;
   line-height: 1.6;
@@ -995,7 +1270,7 @@ const floatMenus = [
 }
 
 .footerLabel {
-  color: rgba(17, 17, 17, 0.55);
+  color: var(--homeText);
   font-size: 12px;
   font-weight: 500;
   margin-right: 10px;
@@ -1043,15 +1318,29 @@ const floatMenus = [
   border-radius: 10px;
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: rgba(246, 249, 255, 0.9);
-  color: rgba(17, 17, 17, 0.72);
+  color: var(--homeText);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
 }
 
+.hotLotteryPanel .tileBtn {
+  height: 52px;
+  border-radius: 8px;
+  border: 1px solid rgba(11, 102, 255, 0.18);
+  background: rgba(246, 250, 255, 1);
+  color: var(--homeText);
+  font-size: 14px;
+}
+
 .tileBtn:hover {
   background: rgba(11, 102, 255, 0.06);
   border-color: rgba(11, 102, 255, 0.16);
+}
+
+.hotLotteryPanel .tileBtn:hover {
+  background: rgba(11, 102, 255, 0.08);
+  border-color: rgba(11, 102, 255, 0.24);
 }
 
 .noticeList {
@@ -1072,7 +1361,7 @@ const floatMenus = [
 }
 
 .noticeTitle {
-  color: #333;
+  color: var(--homeText);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
@@ -1097,7 +1386,7 @@ const floatMenus = [
 }
 
 .noticeDate {
-  color: rgba(51, 51, 51, 0.55);
+  color: var(--homeText);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
@@ -1116,7 +1405,7 @@ const floatMenus = [
 
 .panelHint {
   padding: 14px;
-  color: rgba(17, 17, 17, 0.55);
+  color: var(--homeText);
   font-size: 12px;
   font-weight: 800;
 }
@@ -1144,7 +1433,7 @@ const floatMenus = [
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  color: rgba(17, 17, 17, 0.7);
+  color: var(--homeText);
   font-size: 12px;
   font-weight: 500;
 }
@@ -1165,10 +1454,6 @@ const floatMenus = [
   background-repeat: no-repeat;
   background-position: center;
   background-size: 22px 22px;
-}
-
-.floatIcon[data-key='finance'] {
-  background-image: url('/lt01/float-finance.svg');
 }
 
 .floatIcon[data-key='activity'] {
