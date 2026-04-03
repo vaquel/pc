@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
   import SiteHeader from '../components/SiteHeader.vue'
-import { API_BASE_URL, bannerApi, gameListApi, noticeApi } from '../api'
+import { API_BASE_URL, activityApi, bannerApi, gameListApi, noticeApi } from '../api'
 import { siteState } from '../store/site'
 
 const router = useRouter()
@@ -121,6 +121,19 @@ onMounted(async () => {
   if (!getLocalToken()) router.push('/login')
   loadHotGames()
   try {
+    const res = await activityApi.getTypes()
+    const list = Array.isArray(res?.data) ? res.data : []
+    const mapped = list
+      .map(it => ({
+        title: String(it?.title || ''),
+        typeId: normalizeTypeId(it),
+        orders: normalizeOrders(it),
+      }))
+      .filter(it => it.title && it.typeId)
+      .sort((a, b) => (a.orders ?? 0) - (b.orders ?? 0))
+    activityList.value = mapped
+  } catch {}
+  try {
     const res = await bannerApi.getBanners(2)
     const data = res?.data
     const list = Array.isArray(data)
@@ -217,17 +230,21 @@ async function loadHotGames() {
   }
 }
 
-const hotLottery = [
-  '台湾5分彩',
-  '以太坊5分彩',
-  '波场5分彩',
-  '币安5分彩',
-  '以太坊12秒',
-  '波场极速30秒',
-  '波场极速15秒',
-  '币安极速15秒',
-  '币安极速30秒',
-]
+const activityList = ref([])
+
+function normalizeTypeId(input) {
+  const v = input?.type ?? input?.type_id ?? input?.id ?? input?.typeId ?? 0
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+function normalizeOrders(input) {
+  const v = input?.orders ?? input?.order ?? input?.sort ?? 0
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+const activityItems = computed(() => (activityList.value || []).slice(0, 9))
 
 function formatNoticeDate(input) {
   if (!input) return ''
@@ -324,10 +341,18 @@ const floatMenus = [
         <div class="grid">
           <div class="panel hotLotteryPanel">
             <div class="panelHeader">
-              <div class="panelTitle">热门彩票游戏</div>
+              <div class="panelTitle">活动列表</div>
             </div>
             <div class="btnGrid">
-              <button v-for="t in hotLottery" :key="t" class="tileBtn" type="button">{{ t }}</button>
+              <button
+                v-for="a in activityItems"
+                :key="a.typeId"
+                class="tileBtn"
+                type="button"
+                @click="router.push({ path: `/activities/${a.typeId}`, query: { title: a.title || '' } })"
+              >
+                {{ a.title }}
+              </button>
             </div>
           </div>
 

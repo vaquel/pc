@@ -220,6 +220,7 @@ export const gameListApi = {
 
 export const hbApi = {
   getUserInfo: () => http.post('/hb/user_info', undefined, { auth: true }),
+  getLevel: () => http.post('/hb/level', undefined, { auth: true }),
 }
 
 export const activityApi = {

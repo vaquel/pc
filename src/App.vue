@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted } from 'vue'
 import GlobalModalHost from './components/GlobalModalHost.vue'
+import GlobalToastHost from './components/GlobalToastHost.vue'
 import { siteApi } from './api'
 import { applySite } from './store/site'
 
@@ -15,6 +16,7 @@ onMounted(async () => {
 <template>
   <RouterView />
   <GlobalModalHost />
+  <GlobalToastHost />
 </template>
 
 <style>

@@ -1,4 +1,5 @@
 import { reactive } from 'vue'
+import { showToast } from './toast'
 
 export const modalState = reactive({
   visible: false,
@@ -7,12 +8,10 @@ export const modalState = reactive({
 })
 
 export function showError(message, title = '错误') {
-  modalState.title = title
-  modalState.message = String(message || '请求失败')
-  modalState.visible = true
+  void title
+  showToast(String(message || '请求失败'), { type: 'error' })
 }
 
 export function hideModal() {
   modalState.visible = false
 }
-

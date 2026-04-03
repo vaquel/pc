@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { activityApi, gameTypeApi, hbApi } from '../api'
+import { API_BASE_URL, activityApi, gameTypeApi, hbApi } from '../api'
 import { siteState } from '../store/site'
 
 const route = useRoute()
@@ -19,14 +19,22 @@ function updateIsWap() {
   isWap.value = window.matchMedia?.('(max-width: 740px)')?.matches ?? window.innerWidth <= 740
 }
 
+function joinUrl(base, path) {
+  const b = String(base || '').replace(/\/+$/, '')
+  const p = String(path || '').replace(/^\/+/, '')
+  if (!b) return `/${p}`
+  if (!p) return b
+  return `${b}/${p}`
+}
+
 function normalizeAssetUrl(input) {
   if (!input) return ''
-  const s = String(input).replaceAll('\\/', '/').trim()
+  const s = String(input).replaceAll('\\', '/').trim()
   if (!s) return ''
   if (s.startsWith('http://') || s.startsWith('https://')) return s
   if (s.startsWith('//')) return `https:${s}`
   if (s.includes('api.msgameapi.com') && !s.startsWith('http')) return `https://${s}`
-  return s.startsWith('/') ? s : `/${s}`
+  return joinUrl(API_BASE_URL, s)
 }
 
 const navItems = [
@@ -441,8 +449,8 @@ onMounted(async () => {
   white-space: nowrap;
 }
 .userAvatar {
-  width: 24px;
-  height: 24px;
+  width: 48px;
+  height: 48px;
   border-radius: 999px;
   object-fit: cover;
   border: 1px solid rgba(0, 0, 0, 0.06);
