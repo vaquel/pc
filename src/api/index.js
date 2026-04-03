@@ -190,6 +190,20 @@ export const gameTypeApi = {
   getGameTypes: () => http.post('/game_type', undefined, { auth: true }),
 }
 
+export const gameListApi = {
+  getGameList: payload => http.post('/game_list', payload, { auth: true }),
+  getHotGames: () => http.post('/game_list', { hot: 1 }, { auth: true }),
+}
+
+export const hbApi = {
+  getUserInfo: () => http.post('/hb/user_info', undefined, { auth: true }),
+}
+
+export const activityApi = {
+  getTypes: () => http.post('/activity_type', undefined, { auth: true }),
+  getList: payload => http.post('/activity', payload, { auth: true }),
+}
+
 export const regApi = {
   getRegConfig: () => http.post('/reg_c', undefined, { auth: false }),
 }

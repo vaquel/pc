@@ -15,6 +15,7 @@ const username = ref('')
 const password = ref('')
 const remember = ref(true)
 const captchaCode = ref('')
+const captchaId = ref('')
 const captchaSrc = ref('')
 const captchaLoading = ref(false)
 const loginLoading = ref(false)
@@ -277,16 +278,24 @@ async function onLogin() {
   if (!account) return showError('请输入您的用户名', '登录失败')
   if (!pwd) return showError('请输入您的登录密码', '登录失败')
   if (!cap) return showError('请输入验证码', '登录失败')
+  if (!captchaId.value) return showError('请先获取验证码', '登录失败')
   if (loginLoading.value) return
 
   loginLoading.value = true
   try {
-    const res = await authApi.login({ account, password: pwd, captcha: cap })
+    const res = await authApi.login({ account, password: pwd, captcha: cap, captcha_id: captchaId.value })
+    const data = res?.data
     const token =
-      (res && res.data && (res.data.token || res.data.Token || res.data.access_token || res.data.accessToken)) ||
+      (typeof data === 'string' ? data : '') ||
+      (data && (data.token || data.Token || data.access_token || data.accessToken)) ||
       (res && (res.token || res.Token || res.access_token || res.accessToken)) ||
       ''
-    if (token) localStorage.setItem('token', String(token))
+    if (!token) {
+      showError('登录成功但未返回 token，请联系后端确认返回字段', '登录失败')
+      loadCaptcha()
+      return
+    }
+    localStorage.setItem('token', String(token))
     forgotVisible.value = false
     registerVisible.value = false
     router.push('/home')
@@ -328,11 +337,22 @@ async function loadCaptcha() {
   if (captchaLoading.value) return
   captchaLoading.value = true
   try {
+    captchaId.value = ''
     const res = await captchaApi.getCaptchaRaw()
     const ct = (res.headers.get('content-type') || '').toLowerCase()
+    const headerId =
+      res.headers.get('captcha-id') ||
+      res.headers.get('captcha_id') ||
+      res.headers.get('x-captcha-id') ||
+      res.headers.get('x-captcha_id') ||
+      ''
+    if (headerId) captchaId.value = String(headerId)
     if (ct.includes('application/json')) {
       const json = await res.json().catch(() => null)
-      const src = normalizeCaptchaSrc(json?.data ?? json)
+      const payload = json?.data ?? json
+      const id = payload?.captcha_id ?? payload?.captchaId ?? json?.captcha_id ?? json?.captchaId ?? ''
+      if (id) captchaId.value = String(id)
+      const src = normalizeCaptchaSrc(payload)
       if (src) captchaSrc.value = src
       return
     }
@@ -344,6 +364,18 @@ async function loadCaptcha() {
       return
     }
     const text = await res.text().catch(() => '')
+    const s = String(text || '').trim()
+    if (s.startsWith('{') || s.startsWith('[')) {
+      try {
+        const json = JSON.parse(s)
+        const payload = json?.data ?? json
+        const id = payload?.captcha_id ?? payload?.captchaId ?? json?.captcha_id ?? json?.captchaId ?? ''
+        if (id) captchaId.value = String(id)
+        const src = normalizeCaptchaSrc(payload)
+        if (src) captchaSrc.value = src
+        return
+      } catch {}
+    }
     const src = normalizeCaptchaSrc(text)
     if (src) captchaSrc.value = src
   } catch {

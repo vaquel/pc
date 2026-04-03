@@ -1,14 +1,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { API_BASE_URL, bannerApi, gameTypeApi, noticeApi } from '../api'
+  import SiteHeader from '../components/SiteHeader.vue'
+import { API_BASE_URL, bannerApi, gameListApi, noticeApi } from '../api'
 import { siteState } from '../store/site'
 
 const router = useRouter()
-
-function backToLogin() {
-  router.push('/login')
-}
 
 const logoSrc = () => siteState.webLogo || '/assets/logo_blue-B7kOdN8N.png'
 
@@ -17,6 +14,18 @@ const isWap = ref(false)
 function updateIsWap() {
   if (typeof window === 'undefined') return
   isWap.value = window.matchMedia?.('(max-width: 740px)')?.matches ?? window.innerWidth <= 740
+}
+
+function getLocalToken() {
+  try {
+    const t = localStorage.getItem('token') || ''
+    const s = String(t || '').trim()
+    if (!s) return ''
+    if (s === 'undefined' || s === 'null') return ''
+    return s
+  } catch {
+    return ''
+  }
 }
 
 function joinUrl(base, path) {
@@ -109,6 +118,8 @@ onMounted(async () => {
     window.addEventListener('resize', updateIsWap)
     resizeListenerAttached = true
   }
+  if (!getLocalToken()) router.push('/login')
+  loadHotGames()
   try {
     const res = await bannerApi.getBanners(2)
     const data = res?.data
@@ -175,86 +186,35 @@ onBeforeUnmount(() => {
   }
 })
 
-const navItems = [
-  { label: '首页', active: true },
-  { label: '彩票', active: false },
-  { label: '娱乐', active: false },
-  { label: '管理', active: false },
-]
+const hotGames = ref([])
+const hotGamesLoading = ref(false)
 
-const navRef = ref(null)
-const gameMenuVisible = ref(false)
-const gameMenuLeft = ref(0)
-const gameTypes = ref([])
-const gameTypeLoading = ref(false)
-const gameMenuWidth = 980
-let gameTypeFetchedAt = 0
-let gameMenuHideTimer = 0
-
-function cancelHideGameMenu() {
-  if (!gameMenuHideTimer) return
-  window.clearTimeout(gameMenuHideTimer)
-  gameMenuHideTimer = 0
+function resolveHotGameImg(item) {
+  const icon = isWap.value ? item?.wap_img : item?.pc_img
+  return normalizeAssetUrl(icon || item?.img || '')
 }
 
-function scheduleHideGameMenu() {
-  cancelHideGameMenu()
-  gameMenuHideTimer = window.setTimeout(() => {
-    gameMenuVisible.value = false
-    gameMenuHideTimer = 0
-  }, 120)
-}
-
-function resolveGameTypeIcon(item) {
-  const icon = isWap.value ? item?.wap_icon : item?.pc_icon
-  return normalizeAssetUrl(icon || '')
-}
-
-async function loadGameTypesIfNeeded() {
-  if (gameTypeLoading.value) return
-  const now = Date.now()
-  if (gameTypeFetchedAt && now - gameTypeFetchedAt < 30000 && gameTypes.value.length) return
-  gameTypeLoading.value = true
+async function loadHotGames() {
+  if (hotGamesLoading.value) return
+  hotGamesLoading.value = true
   try {
-    const res = await gameTypeApi.getGameTypes()
+    const res = await gameListApi.getGameList({ hot: 1 })
     const list = Array.isArray(res?.data) ? res.data : []
     const mapped = list
       .map(it => ({
         title: String(it?.title || ''),
-        type: Number(it?.type ?? 0),
-        orders: Number(it?.orders ?? 0),
-        icon: resolveGameTypeIcon(it),
+        apiCode: String(it?.api_code || ''),
+        apiType: Number(it?.api_type ?? 0),
+        orders: Number(it?.orders ?? it?.order ?? it?.sort ?? 0),
+        img: resolveHotGameImg(it),
       }))
       .filter(it => it.title)
       .sort((a, b) => (a.orders ?? 0) - (b.orders ?? 0))
-    gameTypes.value = mapped
-    gameTypeFetchedAt = now
+    hotGames.value = mapped
   } catch {
   } finally {
-    gameTypeLoading.value = false
+    hotGamesLoading.value = false
   }
-}
-
-function onNavItemEnter(it, ev) {
-  if (it?.label !== '娱乐') {
-    if (gameMenuVisible.value) scheduleHideGameMenu()
-    return
-  }
-  cancelHideGameMenu()
-  gameMenuVisible.value = true
-  const navEl = navRef.value
-  const target = ev?.currentTarget
-  if (navEl && target?.getBoundingClientRect) {
-    const navRect = navEl.getBoundingClientRect()
-    const tRect = target.getBoundingClientRect()
-    const center = tRect.left - navRect.left + tRect.width / 2
-    const half = gameMenuWidth / 2
-    const clamped = Math.max(half, Math.min(navRect.width - half, center))
-    gameMenuLeft.value = clamped
-  } else {
-    gameMenuLeft.value = 0
-  }
-  loadGameTypesIfNeeded()
 }
 
 const hotLottery = [
@@ -279,12 +239,7 @@ function formatNoticeDate(input) {
 
 const notices = ref([])
 
-const hotLiveGames = [
-  { title: 'AG真人', img: '/lt01/game-ag.svg' },
-  { title: 'PG电子', img: '/lt01/game-pg.svg' },
-  { title: 'OG真人', img: '/lt01/game-og.svg' },
-  { title: '视讯彩票', img: '/lt01/game-lottery.svg' },
-]
+const hotLiveGames = computed(() => hotGames.value || [])
 
 const advantages = [
   {
@@ -328,58 +283,7 @@ const floatMenus = [
 
 <template>
   <div class="site">
-    <header class="siteHeader">
-      <div class="headerInner">
-        <div class="brand" aria-label="站点品牌">
-          <img class="brandLogo" :src="logoSrc()" alt="蓝图 blueprint" />
-        </div>
-
-        <nav ref="navRef" class="nav" aria-label="主导航" @mouseleave="scheduleHideGameMenu">
-          <a
-            v-for="it in navItems"
-            :key="it.label"
-            class="navItem"
-            href="javascript:void(0)"
-            :data-active="it.active ? '1' : '0'"
-            :data-label="it.label"
-            :data-open="it.label === '娱乐' && gameMenuVisible ? '1' : '0'"
-            @mouseenter="e => onNavItemEnter(it, e)"
-          >
-            {{ it.label }}
-          </a>
-
-          <div
-            v-if="gameMenuVisible"
-            class="gameMenu"
-            :style="{ left: `${gameMenuLeft}px`, width: `${gameMenuWidth}px` }"
-            @mouseenter="cancelHideGameMenu"
-            @mouseleave="scheduleHideGameMenu"
-          >
-            <div v-if="gameTypeLoading && !gameTypes.length" class="gameMenuHint">加载中...</div>
-            <div v-else class="gameMenuGrid">
-              <button v-for="g in gameTypes" :key="g.type" class="gameMenuCard" type="button">
-                <div class="gameMenuCardTitle">{{ g.title }}</div>
-                <div class="gameMenuCardMedia" aria-hidden="true">
-                  <img v-if="g.icon" :src="g.icon" alt="" />
-                </div>
-              </button>
-            </div>
-          </div>
-        </nav>
-
-        <div class="headerRight">
-          <div class="userInfo">
-            <span class="userGreet">您好</span>
-            <a class="userLink" href="javascript:void(0)">zxm111222</a>
-            <span class="userMeta">余额：0</span>
-          </div>
-          <button class="headerBtn primary" type="button">充值</button>
-          <button class="headerBtn secondary" type="button">提现</button>
-          <button class="iconBtn" type="button" aria-label="消息" data-icon="msg"></button>
-          <button class="iconBtn" type="button" aria-label="退出" data-icon="logout" @click="backToLogin"></button>
-        </div>
-      </div>
-    </header>
+    <SiteHeader />
 
     <main class="siteMain" role="main">
       <section class="hero" aria-label="横幅" @mouseenter="stopBannerTimer" @mouseleave="startBannerTimer">
@@ -445,13 +349,23 @@ const floatMenus = [
         </div>
 
         <div class="grid">
-          <div class="panel">
+          <div class="panel hotEntertainPanel">
             <div class="panelHeader">
               <div class="panelTitle">热门娱乐游戏</div>
             </div>
             <div class="gameGrid">
-              <button v-for="g in hotLiveGames" :key="g.title" class="gameCard" type="button">
-                <img class="gameImg" :src="g.img" :alt="g.title" />
+              <div v-if="hotGamesLoading && !hotLiveGames.length" class="hotGameHint">加载中...</div>
+              <button
+                v-for="g in hotLiveGames"
+                :key="`${g.apiType}-${g.apiCode || g.title}`"
+                class="gameCard"
+                type="button"
+                @click="router.push({ path: `/games/${g.apiType}`, query: { title: g.title || '' } })"
+              >
+                <div class="hotGameTitle">{{ g.title }}</div>
+                <div class="hotGameMedia" aria-hidden="true">
+                  <img v-if="g.img" :src="g.img" alt="" />
+                </div>
               </button>
             </div>
           </div>
@@ -554,168 +468,6 @@ const floatMenus = [
   background:
     radial-gradient(800px 420px at 50% 0%, rgba(11, 102, 255, 0.06), rgba(11, 102, 255, 0) 70%),
     linear-gradient(180deg, rgba(245, 247, 251, 1), rgba(245, 247, 251, 1));
-  color: var(--homeText);
-}
-
-.siteHeader {
-  height: 64px;
-  background: #fff;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-.headerInner {
-  height: 64px;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 16px;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.brandLogo {
-  width: 150px;
-  height: 44px;
-  object-fit: contain;
-}
-
-.nav {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  flex: 1;
-  position: relative;
-}
-
-.navItem {
-  color: var(--homeText);
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 500;
-  padding: 8px 10px;
-  border-radius: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.navItem[data-active='1'] {
-  color: var(--homeText);
-  background: transparent;
-}
-
-.navItem[data-label='娱乐']::after {
-  content: '▾';
-  font-size: 12px;
-  transform: translateY(-1px);
-}
-
-.navItem[data-label='娱乐'][data-open='1']::after {
-  content: '▴';
-}
-
-.gameMenu {
-  position: absolute;
-  top: calc(100% + 10px);
-  transform: translateX(-50%);
-  background: rgba(255, 255, 255, 0.98);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 14px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
-  padding: 14px;
-  z-index: 100;
-}
-
-.gameMenuHint {
-  padding: 18px 10px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--homeText);
-}
-
-.gameMenuGrid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-}
-
-.gameMenuCard {
-  border: 1px solid rgba(11, 123, 255, 0.18);
-  background: linear-gradient(180deg, rgba(235, 248, 255, 1), rgba(255, 255, 255, 1));
-  border-radius: 10px;
-  height: 140px;
-  padding: 14px 14px;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  text-align: left;
-}
-
-.gameMenuCard:hover {
-  border-color: rgba(11, 123, 255, 0.3);
-  background: linear-gradient(180deg, rgba(226, 245, 255, 1), rgba(255, 255, 255, 1));
-}
-
-.gameMenuCardTitle {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--homeText);
-  position: relative;
-  z-index: 1;
-}
-
-.gameMenuCardMedia {
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  top: 44px;
-  bottom: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.gameMenuCardMedia img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-.headerRight {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.userInfo {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-right: 4px;
-  color: var(--homeText);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.userGreet {
-  color: var(--homeText);
-}
-
-.userLink {
-  color: var(--homeText);
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.userMeta {
   color: var(--homeText);
 }
 
@@ -1088,6 +840,60 @@ const floatMenus = [
   object-fit: cover;
   display: block;
   background: rgba(0, 0, 0, 0.03);
+}
+
+.hotEntertainPanel .gameGrid {
+  padding: 14px 14px 16px;
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.hotEntertainPanel .hotGameHint {
+  padding: 12px 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--homeText);
+}
+
+.hotEntertainPanel .gameCard {
+  height: 118px;
+  border: 1px solid rgba(11, 123, 255, 0.18);
+  background: linear-gradient(180deg, rgba(235, 248, 255, 1), rgba(255, 255, 255, 1));
+  position: relative;
+  padding: 14px 14px;
+  text-align: left;
+  flex: 0 0 calc((100% - 36px) / 4);
+  scroll-snap-align: start;
+}
+
+.hotEntertainPanel .hotGameTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--homeText);
+  position: relative;
+  z-index: 1;
+}
+
+.hotEntertainPanel .hotGameMedia {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 44px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hotEntertainPanel .hotGameMedia img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .securityBody {
