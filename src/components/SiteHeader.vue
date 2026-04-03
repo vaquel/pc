@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import AppLoading from './AppLoading.vue'
 import { API_BASE_URL, activityApi, gameTypeApi, hbApi } from '../api'
 import { siteState } from '../store/site'
 
@@ -269,7 +270,7 @@ onMounted(async () => {
           @mouseenter="cancelHideGameMenu"
           @mouseleave="scheduleHideGameMenu"
         >
-          <div v-if="gameTypeLoading && !gameTypes.length" class="gameMenuHint">加载中...</div>
+          <AppLoading v-if="gameTypeLoading && !gameTypes.length" class="gameMenuHint" size="sm" />
           <div v-else class="gameMenuGrid">
             <button v-for="g in gameTypes" :key="g.type" class="gameMenuCard" type="button" @click="onGameTypeClick(g)">
               <div class="gameMenuCardTitle">{{ g.title }}</div>
@@ -287,7 +288,7 @@ onMounted(async () => {
           @mouseenter="cancelHideGameMenu"
           @mouseleave="scheduleHideGameMenu"
         >
-          <div v-if="activityTypeLoading && !activityTypes.length" class="gameMenuHint">加载中...</div>
+          <AppLoading v-if="activityTypeLoading && !activityTypes.length" class="gameMenuHint" size="sm" />
           <div v-else class="gameMenuGrid">
             <button v-for="a in activityTypes" :key="a.type" class="gameMenuCard" type="button" @click="onActivityTypeClick(a)">
               <div class="gameMenuCardTitle">{{ a.title }}</div>

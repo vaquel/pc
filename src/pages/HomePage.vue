@@ -1,7 +1,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-  import SiteHeader from '../components/SiteHeader.vue'
+import AppLoading from '../components/AppLoading.vue'
+import SiteHeader from '../components/SiteHeader.vue'
 import { API_BASE_URL, activityApi, bannerApi, gameListApi, noticeApi } from '../api'
 import { siteState } from '../store/site'
 
@@ -333,7 +334,7 @@ const floatMenus = [
               ></button>
             </div>
           </template>
-          <div v-else class="heroInner heroInnerLoading" aria-label="banner加载中"></div>
+          <AppLoading v-else class="heroInner heroInnerLoading" variant="block" />
         </div>
       </section>
 
@@ -379,7 +380,7 @@ const floatMenus = [
               <div class="panelTitle">热门娱乐游戏</div>
             </div>
             <div class="gameGrid">
-              <div v-if="hotGamesLoading && !hotLiveGames.length" class="hotGameHint">加载中...</div>
+              <AppLoading v-if="hotGamesLoading && !hotLiveGames.length" class="hotGameHint" size="sm" />
               <button
                 v-for="g in hotLiveGames"
                 :key="`${g.apiType}-${g.apiCode || g.title}`"

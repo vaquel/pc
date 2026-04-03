@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import AppLoading from './AppLoading.vue'
 import { captchaApi } from '../api'
 
 const props = defineProps({
@@ -62,7 +63,7 @@ onMounted(() => {
       @keydown.space.prevent="refresh"
     >
       <img v-if="imgSrc" class="img" :src="imgSrc" alt="图形验证码" :aria-busy="loading ? 'true' : 'false'" />
-      <div v-else class="imgPlaceholder" :aria-busy="loading ? 'true' : 'false'">加载中</div>
+      <AppLoading v-else class="imgPlaceholder" size="xs" text="加载中" :aria-busy="loading ? 'true' : 'false'" />
     </div>
   </div>
 </template>

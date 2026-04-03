@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import AppLoading from '../components/AppLoading.vue'
 import SiteHeader from '../components/SiteHeader.vue'
 import { gameListApi } from '../api'
 
@@ -75,7 +76,7 @@ watch(apiType, loadList)
           <div class="panelTitle">{{ pageTitle }}</div>
         </div>
 
-        <div v-if="loading" class="state">加载中...</div>
+        <AppLoading v-if="loading" class="state" variant="block" size="sm" />
         <div v-else-if="!games.length" class="state">暂无数据</div>
         <div v-else class="grid">
           <button v-for="g in games" :key="g.title" class="card" type="button">

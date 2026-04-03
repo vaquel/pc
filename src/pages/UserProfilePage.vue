@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import AppLoading from '../components/AppLoading.vue'
 import SiteHeader from '../components/SiteHeader.vue'
 import { API_BASE_URL, hbApi } from '../api'
 
@@ -458,7 +459,6 @@ onBeforeUnmount(() => {
             <div class="vipText">
               <div class="vipTitle">{{ vipTitle || levelTitle || '-' }}</div>
               <div class="vipSub">
-                <span v-if="requirementText" class="vipTag">{{ requirementText }}</span>
                 <span v-if="nextVipTitle" class="vipNext">下一等级：{{ nextVipTitle }}</span>
               </div>
             </div>
@@ -596,7 +596,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div v-if="vipLoading" class="vipLoading">加载中...</div>
+          <AppLoading v-if="vipLoading" class="vipLoading" size="sm" />
         </div>
       </section>
 
@@ -639,7 +639,7 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <div v-if="loading" class="loadingMask">加载中...</div>
+      <AppLoading v-if="loading" class="loadingMask" size="sm" />
     </main>
   </div>
 </template>
