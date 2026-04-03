@@ -131,6 +131,18 @@ function createHttpClient({
     }
     clearTimeout(t)
 
+    if (res && res.status === 401) {
+      try {
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('token')
+          } catch {}
+          window.location.href = '/login'
+        }
+      } catch {}
+      throw new ApiError('未登录或会话已过期', { status: 401, url, method })
+    }
+
     if (raw) return res
 
     const data = await readResponse(res)
@@ -143,6 +155,17 @@ function createHttpClient({
     if (data && typeof data === 'object' && 'code' in data) {
       const code = data.code
       const ok = String(code) === '200'
+      if (String(code) === '401') {
+        try {
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem('token')
+            } catch {}
+            window.location.href = '/login'
+          }
+        } catch {}
+        throw new ApiError('未登录或会话已过期', { status: res.status, code, data, url, method })
+      }
       if (!ok) {
         onBusinessError?.(data)
         const msg = String(data.msg || data.message || '请求失败')

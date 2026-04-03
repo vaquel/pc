@@ -295,7 +295,7 @@ onMounted(async () => {
         <div class="userInfo">
           <img v-if="userAvatar" class="userAvatar" :src="userAvatar" alt="" />
           <span class="userGreet">您好</span>
-          <a class="userLink" href="javascript:void(0)">{{ userName }}</a>
+          <a class="userLink" href="javascript:void(0)" @click.prevent="router.push('/user')">{{ userName }}</a>
           <span class="userMeta">余额：{{ userMoney }}</span>
         </div>
         <button class="headerBtn primary" type="button">充值</button>
